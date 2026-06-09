@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.3.schema.json",
+  "manifest_version": "0.3",
+  "name": "tenant-mcp",
+  "version": "0.1.0",
+  "display_name": "Tenant — Jobs & Bewerbungen",
+  "description": "Persönlicher Job-Match- und Bewerbungs-Zugang (Tenant) für Claude.",
+  "long_description": "Dünner Proxy auf den persönlichen Tenant-Dienst. Liefert deine gescorte Job-Trefferliste, den vollen Stellentext, dein Bewerbungs-Profil und speichert erstellte Bewerbungen — alles über deinen persönlichen API-Key (pro Person isoliert).",
+  "author": { "name": "Florian Rister", "email": "florian@konektos.de" },
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "TENANT_URL": "${user_config.tenantUrl}",
+        "TENANT_API_KEY": "${user_config.apiKey}"
+      }
+    }
+  },
+  "user_config": {
+    "apiKey": {
+      "type": "string",
+      "title": "API-Key",
+      "description": "Dein persönlicher Tenant-Key (von Florian erhalten). Wird verschlüsselt im OS-Keychain gespeichert.",
+      "sensitive": true,
+      "required": true
+    },
+    "tenantUrl": {
+      "type": "string",
+      "title": "Tenant-URL",
+      "description": "Service-URL. Standard belassen, außer für lokalen Test.",
+      "default": "https://tenant.konektos.de",
+      "required": true
+    }
+  },
+  "tools": [
+    { "name": "get_my_matches", "description": "Deine gescorte Job-Trefferliste." },
+    { "name": "get_job", "description": "Voller Stellentext zu einer job_id." },
+    { "name": "get_my_profile", "description": "Dein Bewerbungs-Profil." },
+    { "name": "save_application", "description": "Eine erstellte Bewerbung tracken." }
+  ],
+  "keywords": ["jobs", "bewerbung", "apply", "career"],
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": { "node": ">=20" }
+  }
+}
