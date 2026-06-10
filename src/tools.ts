@@ -127,7 +127,10 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
         status: z
           .string()
           .min(1)
-          .describe("Status, z.B. 'drafted', 'applied'."),
+          .describe(
+            "Bewerbungs-Status. Erlaubt: 'drafted', 'applied', 'interview', " +
+              "'offer', 'rejected', 'paused'. Server validiert — anderer Wert → 422.",
+          ),
         company: z.string().optional().describe("Firmenname (Dedup/Anzeige)."),
         role: z.string().optional().describe("Rollen-/Stellentitel."),
         notes: z.string().optional().describe("Freitext-Notiz (optional)."),

@@ -1,0 +1,14 @@
+# Pack only what Claude Desktop needs: manifest.json + server/index.js + icon.png.
+# server/index.js is a self-contained esbuild --bundle (deps inlined) → no node_modules.
+node_modules/
+dist-stage/
+src/
+.git/
+*.mcpb
+package-lock.json
+tsconfig.json
+*.md
+.gitignore
+.mcpbignore
+*.log
+.DS_Store

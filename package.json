@@ -8,9 +8,8 @@
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=server/index.js --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
     "typecheck": "tsc --noEmit",
     "inspect": "node server/index.js",
-    "validate": "mcpb validate",
-    "pack": "mcpb pack",
-    "prepack:mcpb": "npm run build"
+    "validate": "mcpb validate manifest.json",
+    "pack": "npm run build && mcpb pack . tenant-mcp.mcpb"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

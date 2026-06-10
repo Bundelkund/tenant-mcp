@@ -11,7 +11,7 @@ Dünner MCP-Server (MCPB) der den persönlichen **Tenant**-Dienst (`tenant.konek
 | `get_my_profile` | `GET /my/profile` | Bewerbungs-Profil (Schreib-Quelle) |
 | `save_application` | `POST /my/applications` | Bewerbung tracken |
 
-> Heute live: nur `get_my_matches`. `get_job` / `get_my_profile` / `save_application` liefern Tenant-404 bis die zugehörigen Endpoints stehen (Tenant-Tasks) — der MCP-Code braucht dafür keine Änderung.
+> Alle 4 Endpoints sind im Tenant **gebaut** (tenant-module commit `bf02c18`). `get_my_matches` ist prod-live; `get_job` / `get_my_profile` / `save_application` liefern prod-404 nur bis tenant-module deployed ist — danach live ohne MCP-Code-Change.
 
 ## Build
 
