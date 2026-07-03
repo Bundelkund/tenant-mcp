@@ -114,6 +114,45 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
     },
   );
 
+  // ── set_my_profile ──────────────────────────────────────────────────────
+  server.registerTool(
+    "set_my_profile",
+    {
+      title: "Mein Bewerbungs-Profil schreiben",
+      description:
+        "Schreibt/aktualisiert dein Bewerbungs-Profil (positioning, cv_text, " +
+        "achievements, skills_matrix, writing_style) — die Datenquelle, die " +
+        "get_my_profile liefert und die apply/rank lesen. Partial-Update: nur " +
+        "übergebene Felder werden geschrieben, die anderen bleiben unverändert. " +
+        "Onboarding-Ziel für den letter-forge-Fragebogen. Nur auf den eigenen " +
+        "API-Key gescoped.",
+      inputSchema: {
+        positioning: z.string().optional().describe("Kern-Positionierung (1-2 Absätze)."),
+        cv_text: z.string().optional().describe("CV als Markdown/Freitext."),
+        achievements: z.string().optional().describe("Quantifizierte Erfolge."),
+        skills_matrix: z.string().optional().describe("Skills mit Evidenz."),
+        writing_style: z.string().optional().describe("Ton/Schreibstil-Regeln."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ positioning, cv_text, achievements, skills_matrix, writing_style }) => {
+      try {
+        // Only forward fields the caller actually set → server does exclude_unset,
+        // so a one-field edit never clobbers the other four with null.
+        const body: Record<string, string> = {};
+        if (positioning !== undefined) body.positioning = positioning;
+        if (cv_text !== undefined) body.cv_text = cv_text;
+        if (achievements !== undefined) body.achievements = achievements;
+        if (skills_matrix !== undefined) body.skills_matrix = skills_matrix;
+        if (writing_style !== undefined) body.writing_style = writing_style;
+        const data = await tenantRequest(cfg, { method: "PUT", path: "/my/profile", body });
+        return ok(data);
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
   // ── save_application ────────────────────────────────────────────────────
   server.registerTool(
     "save_application",

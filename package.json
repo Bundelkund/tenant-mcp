@@ -1,6 +1,6 @@
 {
   "name": "tenant-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Persönlicher Job-Match- und Bewerbungs-Zugang (Tenant) für Claude Desktop via MCPB.",
   "type": "module",
   "private": true,

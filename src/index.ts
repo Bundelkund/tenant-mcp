@@ -16,12 +16,13 @@ async function main(): Promise<void> {
   const cfg = loadConfig();
 
   const server = new McpServer(
-    { name: "tenant-mcp", version: "0.1.0" },
+    { name: "tenant-mcp", version: "0.2.0" },
     {
       instructions:
         "Persönlicher Job-/Bewerbungs-Zugang. Reihenfolge: get_my_matches " +
         "(Trefferliste) → get_job(job_id) für den vollen Stellentext → " +
-        "get_my_profile als Schreib-Quelle. save_application erst nach fertiger " +
+        "get_my_profile als Lese-Quelle. set_my_profile schreibt das Profil " +
+        "(Onboarding/letter-forge). save_application erst nach fertiger " +
         "Bewerbung. Jeder Aufruf ist auf den eigenen API-Key gescoped.",
     },
   );
