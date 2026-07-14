@@ -5,3 +5,6 @@ dist-stage/
 *.log
 .DS_Store
 package-lock.json
+
+# Claude Code local session state
+.claude/
