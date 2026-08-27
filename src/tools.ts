@@ -77,7 +77,11 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
       title: "Stellentext",
       description:
         "Voller Stellentext (description) zu einer job_id aus get_my_matches. " +
-        "Pflicht-Input fürs Anschreiben — die Match-Liste enthält nur Metadaten.",
+        "Pflicht-Input fürs Anschreiben — die Match-Liste enthält nur Metadaten. " +
+        "Trägt die Antwort das Feld degraded, war die Stellen-Datenbank nicht " +
+        "erreichbar: dann gibt es NUR Titel/Firma/Ort/Link und description ist null. " +
+        "In dem Fall kein Anschreiben schreiben, sondern sagen, dass der Stellentext " +
+        "fehlt — ein Anschreiben ohne Stellentext ist geraten.",
       inputSchema: {
         job_id: z.string().min(1).describe("job_id aus get_my_matches."),
       },
@@ -160,7 +164,12 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
       title: "Bewerbung tracken",
       description:
         "Speichert/aktualisiert eine erstellte Bewerbung im persönlichen Tracker. " +
-        "Schreib-Operation — nur nach Erstellung von Anschreiben + CV aufrufen.",
+        "Schreib-Operation — nur nach Erstellung von Anschreiben + CV aufrufen. " +
+        "Die Antwort trägt effective: steht dort false, wurde das Ereignis zwar " +
+        "gespeichert, ändert aber den angezeigten Stand NICHT (ein älteres Datum " +
+        "liegt hinter einem neueren Eintrag). displayed_status nennt dann, was " +
+        "stattdessen gilt. Gespeichert ist nicht gleich sichtbar — nicht ungeprüft " +
+        "Erfolg melden.",
       inputSchema: {
         job_id: z.string().min(1).describe("job_id der Bewerbung."),
         status: z
