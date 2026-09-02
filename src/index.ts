@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   const cfg = loadConfig();
 
   const server = new McpServer(
-    { name: "tenant-mcp", version: "0.2.0" },
+    { name: "tenant-mcp", version: "0.3.0" },
     {
       instructions:
         "Persönlicher Job-/Bewerbungs-Zugang. Reihenfolge: get_my_matches " +

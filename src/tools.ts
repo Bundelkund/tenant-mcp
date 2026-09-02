@@ -198,4 +198,73 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
       }
     },
   );
+
+  // ── save_interview ───────────────────────────────────────────────────────
+  server.registerTool(
+    "save_interview",
+    {
+      title: "Interview-Runde speichern",
+      description:
+        "Speichert/aktualisiert eine Interview-Runde für eine Stelle. Schreib-Operation, " +
+        "keyed auf (job_id, stage) — ein zweiter Aufruf mit derselben stage schreibt in " +
+        "dieselbe Zeile weiter (z.B. erst prep_notes VOR dem Termin, dann debrief_notes " +
+        "DANACH), ohne bereits gesetzte Felder zu löschen. Nur mitgeschickte Felder werden " +
+        "geändert. Andere stage (z.B. 'onsite' statt 'screening') → eigene, neue Zeile.",
+      inputSchema: {
+        job_id: z.string().min(1).describe("job_id der Stelle, zu der die Runde gehört."),
+        stage: z
+          .string()
+          .min(1)
+          .describe(
+            "Freitext-Bezeichnung der Runde, z.B. 'screening', 'technical', 'onsite', " +
+              "'final'. Identifiziert zusammen mit job_id die Zeile — zweiter Aufruf mit " +
+              "gleicher stage aktualisiert statt eine neue Runde anzulegen.",
+          ),
+        company: z.string().optional().describe("Firmenname."),
+        role: z.string().optional().describe("Rollen-/Stellentitel."),
+        scheduled_at: z.string().optional().describe("ISO-8601-Zeitpunkt des Termins, falls bekannt."),
+        prep_notes: z.string().optional().describe("Vorbereitungsnotizen, vor dem Termin geschrieben."),
+        debrief_notes: z.string().optional().describe("Nachbereitungsnotizen, nach dem Termin geschrieben."),
+        outcome: z.string().optional().describe("Freitext-Ergebnis der Runde, z.B. 'weiter zur nächsten Runde', 'abgesagt'."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ job_id, stage, company, role, scheduled_at, prep_notes, debrief_notes, outcome }) => {
+      try {
+        const data = await tenantRequest(cfg, {
+          method: "POST",
+          path: "/my/interviews",
+          body: { job_id, stage, company, role, scheduled_at, prep_notes, debrief_notes, outcome },
+        });
+        return ok(data);
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  // ── get_my_interviews ────────────────────────────────────────────────────
+  server.registerTool(
+    "get_my_interviews",
+    {
+      title: "Meine Interview-Runden",
+      description:
+        "Liefert deine gespeicherten Interview-Runden, neueste zuerst. Optional auf eine " +
+        "job_id gefiltert — z.B. um vor einem debrief-Aufruf die passende stage einer " +
+        "Runde zu finden.",
+      inputSchema: {
+        job_id: z.string().optional().describe("Nur Runden dieser Stelle liefern."),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ job_id }) => {
+      try {
+        const path = job_id ? `/my/interviews?job_id=${encodeURIComponent(job_id)}` : "/my/interviews";
+        const data = await tenantRequest(cfg, { path });
+        return ok(data);
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
 }
