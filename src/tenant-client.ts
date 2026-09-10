@@ -8,12 +8,36 @@
  * Security: the API key is NEVER logged, never echoed into a tool result.
  */
 
+import { z } from "zod";
+
 const TIMEOUT_MS = 15_000;
+
+/**
+ * Das strukturierte `detail`, das der Tenant bei manchen Fehlern mitschickt.
+ *
+ * Der Anlass ist 409 `shrink_rejected` (PUT /my/search-terms): dort steht in
+ * `removed`, welche Begriffe wegfielen — die Angabe, die aus einer Absage eine
+ * beantwortbare Rueckfrage macht. Am I/O-Rand EINMAL geparst, damit niemand
+ * weiter unten auf einem `unknown` herumraten muss.
+ */
+const FehlerDetail = z
+  .object({
+    error: z.string().optional(),
+    message: z.string().optional(),
+    kind: z.string().optional(),
+    removed: z.array(z.string()).optional(),
+    hint: z.string().optional(),
+  })
+  .passthrough();
+
+export type TenantErrorDetail = z.infer<typeof FehlerDetail>;
 
 export class TenantError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** Geparstes `detail` der Antwort, sofern es ein Objekt war. */
+    readonly detail?: TenantErrorDetail,
   ) {
     super(message);
     this.name = "TenantError";
@@ -56,6 +80,8 @@ function describe(status: number, detail: string | undefined): string {
 
   if (status === 404) return `Nicht gefunden${d}`;
 
+  if (status === 409) return `Konflikt mit dem gespeicherten Stand${d}`;
+
   if (status >= 500) return `Tenant-Dienst-Fehler (${status})${d}`;
 
   return `Tenant-Antwort ${status}${d}`;
@@ -67,6 +93,15 @@ function isDetailRecord(value: unknown): value is { detail: unknown } {
 
 function isPlainString(value: unknown): value is string {
   return typeof value === "string";
+}
+
+/** Ein strukturiertes `detail` in einen Satz verwandeln, den ein Mensch liest.
+ *  Bevorzugt `message` (dort schreibt der Tenant Klartext); sonst kompaktes
+ *  JSON — immer noch weit mehr als "[object Object]". */
+function readableDetail(detail: TenantErrorDetail): string {
+  if (detail.message !== undefined) return detail.message;
+
+  return JSON.stringify(detail);
 }
 
 type RequestOpts = {
@@ -121,9 +156,27 @@ export async function tenantRequest<T = unknown>(cfg: TenantConfig, opts: Reques
   }
 
   if (!resp.ok) {
-    const detail = isDetailRecord(parsed) ? String(parsed.detail) : isPlainString(parsed) ? parsed : undefined;
+    // FastAPI liefert `detail` mal als Text, mal als Objekt (z.B. 409
+    // shrink_rejected mit {error, message, kind, removed, hint}). Ein blindes
+    // String() machte daraus "[object Object]" — die Meldung war formal da und
+    // inhaltlich weg. Objekte werden deshalb hier EINMAL geparst: lesbar fuer
+    // die Fehlermeldung, strukturiert fuer Aufrufer, die `removed` brauchen.
+    const rohesDetail = isDetailRecord(parsed) ? parsed.detail : undefined;
+    const strukturiert = FehlerDetail.safeParse(rohesDetail);
 
-    throw new TenantError(describe(resp.status, detail), resp.status);
+    const detail = isPlainString(rohesDetail)
+      ? rohesDetail
+      : strukturiert.success
+        ? readableDetail(strukturiert.data)
+        : isPlainString(parsed)
+          ? parsed
+          : undefined;
+
+    throw new TenantError(
+      describe(resp.status, detail),
+      resp.status,
+      strukturiert.success ? strukturiert.data : undefined,
+    );
   }
 
   // SAFETY: Tenant is our own trusted backend; this client does not schema-validate

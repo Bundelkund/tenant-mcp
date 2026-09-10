@@ -4,7 +4,7 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { tenantRequest, TenantError, type loadConfig } from "./tenant-client.js";
+import { tenantRequest, TenantError, type loadConfig, type TenantErrorDetail } from "./tenant-client.js";
 
 type Cfg = ReturnType<typeof loadConfig>;
 
@@ -283,4 +283,100 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
       }
     },
   );
+
+  // ── get_my_search_terms ──────────────────────────────────────────────────
+  server.registerTool(
+    "get_my_search_terms",
+    {
+      title: "Meine Suchbegriffe",
+      description:
+        "Liefert die Begriffe, nach denen der nächtliche Suchlauf für DICH sucht. " +
+        "kind='role' (Default) sind Jobtitel/Rollen, kind='location' sind Orte " +
+        "(inkl. 'Remote'). Ohne Rollen-Begriffe entstehen überhaupt keine Matches — " +
+        "wenn get_my_matches leer ist, ist das hier die erste Prüfung.",
+      inputSchema: {
+        kind: z
+          .enum(["role", "location"])
+          .optional()
+          .describe("'role' (Default) = Jobtitel/Rollen, 'location' = Orte inkl. Remote."),
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ kind }) => {
+      try {
+        const path = kind ? `/my/search-terms?kind=${encodeURIComponent(kind)}` : "/my/search-terms";
+        const data = await tenantRequest(cfg, { path });
+
+        return ok(data);
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  // ── set_my_search_terms ──────────────────────────────────────────────────
+  server.registerTool(
+    "set_my_search_terms",
+    {
+      title: "Meine Suchbegriffe setzen",
+      description:
+        "Setzt die Suchbegriffe EINER Art auf genau diese Liste (kein Anhängen: was " +
+        "fehlt, wird entfernt). kind='role' sind Jobtitel/Rollen, kind='location' sind " +
+        "Orte inkl. 'Remote'. Ohne Orte bleibt das Geo-Signal der Bewertung ungenutzt " +
+        "und die Punktzahlen fallen strukturell niedriger aus — beide Arten setzen. " +
+        "Onboarding-Ziel für letter-forge; Wirkung ab dem nächsten nächtlichen Lauf.",
+      inputSchema: {
+        terms: z
+          .array(z.string().min(1))
+          .min(1)
+          .describe("Die vollständige gewünschte Liste dieser Art — nicht nur die neuen."),
+        kind: z
+          .enum(["role", "location"])
+          .optional()
+          .describe("'role' (Default) oder 'location'."),
+        allow_shrink: z
+          .boolean()
+          .optional()
+          .describe("Nur setzen, wenn das absichtliche Kürzen der Liste bestätigt wurde."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ terms, kind, allow_shrink }) => {
+      try {
+        const data = await tenantRequest(cfg, {
+          method: "PUT",
+          path: "/my/search-terms",
+          body: { terms, kind: kind ?? "role", allow_shrink: allow_shrink ?? false },
+        });
+
+        return ok(data);
+      } catch (err) {
+        // Der Tenant lehnt eine Kürzung mit 409 ab und legt die wegfallenden
+        // Begriffe bei. Das ist keine Panne, sondern eine Rückfrage — als roher
+        // Fehler gereicht wirkt es wie ein Defekt, und der Nutzer bricht ab.
+        if (err instanceof TenantError && err.status === 409) {
+          const entfallend = removedTerms(err.detail);
+
+          if (entfallend.length > 0) {
+            return ok({
+              status: "bestaetigung_noetig",
+              hinweis:
+                `Diese ${entfallend.length} Begriffe würden entfernt, weil sie in der neuen ` +
+                `Liste fehlen. Sollen sie weg, denselben Aufruf mit allow_shrink=true wiederholen; ` +
+                `sollen sie bleiben, in die Liste aufnehmen und erneut senden.`,
+              wuerden_entfernt: entfallend,
+            });
+          }
+        }
+
+        return fail(err);
+      }
+    },
+  );
+}
+
+/** Die `removed`-Liste aus einem 409-`detail` ziehen, falls vorhanden.
+ *  Geparst wurde bereits im Client (FehlerDetail), hier bleibt nur der Zugriff. */
+function removedTerms(detail: TenantErrorDetail | undefined): string[] {
+  return detail?.removed ?? [];
 }
