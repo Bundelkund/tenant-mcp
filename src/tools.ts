@@ -7,17 +7,19 @@ import { z } from "zod";
 import { tenantRequest, TenantError, type loadConfig } from "./tenant-client.js";
 
 type Cfg = ReturnType<typeof loadConfig>;
+
 type ToolResult = {
   content: { type: "text"; text: string }[];
   isError?: boolean;
 };
 
-function ok(data: unknown): ToolResult {
+function ok<T>(data: T): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
 }
 
-function fail(err: unknown): ToolResult {
-  const msg = err instanceof TenantError ? err.message : err instanceof Error ? err.message : String(err);
+function fail(cause: unknown): ToolResult {
+  const msg = cause instanceof TenantError ? cause.message : cause instanceof Error ? cause.message : String(cause);
+
   return { content: [{ type: "text", text: msg }], isError: true };
 }
 
@@ -59,10 +61,13 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
       try {
         const data = await tenantRequest<{ matches: MatchRow[] }>(cfg, { path: "/my/matches" });
         let rows = Array.isArray(data?.matches) ? data.matches : [];
-        if (typeof min_score === "number") rows = rows.filter((r) => Number(r.score) >= min_score);
+
+        if (min_score !== undefined) rows = rows.filter((r) => Number(r.score) >= min_score);
         rows.sort((a, b) => Number(b.score) - Number(a.score));
-        if (typeof limit === "number") rows = rows.slice(0, limit);
+
+        if (limit !== undefined) rows = rows.slice(0, limit);
         else rows = rows.slice(0, 50);
+
         return ok({ count: rows.length, matches: rows });
       } catch (err) {
         return fail(err);
@@ -90,6 +95,7 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
     async ({ job_id }) => {
       try {
         const data = await tenantRequest(cfg, { path: `/my/job/${encodeURIComponent(job_id)}` });
+
         return ok(data);
       } catch (err) {
         return fail(err);
@@ -111,6 +117,7 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
     async () => {
       try {
         const data = await tenantRequest(cfg, { path: "/my/profile" });
+
         return ok(data);
       } catch (err) {
         return fail(err);
@@ -144,12 +151,18 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
         // Only forward fields the caller actually set → server does exclude_unset,
         // so a one-field edit never clobbers the other four with null.
         const body: Record<string, string> = {};
+
         if (positioning !== undefined) body.positioning = positioning;
+
         if (cv_text !== undefined) body.cv_text = cv_text;
+
         if (achievements !== undefined) body.achievements = achievements;
+
         if (skills_matrix !== undefined) body.skills_matrix = skills_matrix;
+
         if (writing_style !== undefined) body.writing_style = writing_style;
         const data = await tenantRequest(cfg, { method: "PUT", path: "/my/profile", body });
+
         return ok(data);
       } catch (err) {
         return fail(err);
@@ -192,6 +205,7 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
           path: "/my/applications",
           body: { job_id, status, company, role, notes },
         });
+
         return ok(data);
       } catch (err) {
         return fail(err);
@@ -236,6 +250,7 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
           path: "/my/interviews",
           body: { job_id, stage, company, role, scheduled_at, prep_notes, debrief_notes, outcome },
         });
+
         return ok(data);
       } catch (err) {
         return fail(err);
@@ -261,6 +276,7 @@ export function registerTools(server: McpServer, cfg: Cfg): void {
       try {
         const path = job_id ? `/my/interviews?job_id=${encodeURIComponent(job_id)}` : "/my/interviews";
         const data = await tenantRequest(cfg, { path });
+
         return ok(data);
       } catch (err) {
         return fail(err);

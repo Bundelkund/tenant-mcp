@@ -20,9 +20,14 @@ export class TenantError extends Error {
   }
 }
 
+export interface TenantConfig {
+  baseUrl: string;
+  apiKey: string;
+}
+
 /** Resolve + validate config once at startup. Throws with a clear message so the
  *  host surfaces a useful error instead of a silent 401 storm. */
-export function loadConfig(): { baseUrl: string; apiKey: string } {
+export function loadConfig(): TenantConfig {
   const apiKey = (process.env.TENANT_API_KEY ?? "").trim();
   let baseUrl = (process.env.TENANT_URL ?? "https://tenant.konektos.de").trim();
 
@@ -31,11 +36,14 @@ export function loadConfig(): { baseUrl: string; apiKey: string } {
       "TENANT_API_KEY fehlt. Trage deinen persönlichen API-Key im Install-Dialog ein.",
     );
   }
+
   baseUrl = baseUrl.replace(/\/+$/, "");
   const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(baseUrl);
+
   if (!baseUrl.startsWith("https://") && !isLocalhost) {
     throw new Error(`TENANT_URL muss HTTPS sein (oder localhost): ${baseUrl}`);
   }
+
   return { baseUrl, apiKey };
 }
 
@@ -43,10 +51,22 @@ export function loadConfig(): { baseUrl: string; apiKey: string } {
  *  raw key out of any output. */
 function describe(status: number, detail: string | undefined): string {
   const d = detail ? ` (${detail})` : "";
+
   if (status === 401) return `Authentifizierung fehlgeschlagen — API-Key ungültig oder fehlt${d}`;
+
   if (status === 404) return `Nicht gefunden${d}`;
+
   if (status >= 500) return `Tenant-Dienst-Fehler (${status})${d}`;
+
   return `Tenant-Antwort ${status}${d}`;
+}
+
+function isDetailRecord(value: unknown): value is { detail: unknown } {
+  return typeof value === "object" && value !== null && "detail" in value;
+}
+
+function isPlainString(value: unknown): value is string {
+  return typeof value === "string";
 }
 
 type RequestOpts = {
@@ -60,23 +80,22 @@ type RequestOpts = {
  * Perform one tenant request. Returns parsed JSON on 2xx, throws TenantError
  * otherwise. Never includes the API key in thrown messages.
  */
-export async function tenantRequest<T = unknown>(
-  cfg: { baseUrl: string; apiKey: string },
-  opts: RequestOpts,
-): Promise<T> {
+export async function tenantRequest<T = unknown>(cfg: TenantConfig, opts: RequestOpts): Promise<T> {
   const url = `${cfg.baseUrl}${opts.path}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   let resp: Response;
+
+  const headers: RequestInit["headers"] =
+    opts.body !== undefined
+      ? { "X-API-Key": cfg.apiKey, Accept: "application/json", "Content-Type": "application/json" }
+      : { "X-API-Key": cfg.apiKey, Accept: "application/json" };
+
   try {
     resp = await fetch(url, {
       method: opts.method ?? "GET",
-      headers: {
-        "X-API-Key": cfg.apiKey,
-        Accept: "application/json",
-        ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
-      },
+      headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
       signal: controller.signal,
     });
@@ -84,6 +103,7 @@ export async function tenantRequest<T = unknown>(
     if (err instanceof Error && err.name === "AbortError") {
       throw new TenantError(`Zeitüberschreitung nach ${TIMEOUT_MS / 1000}s — Tenant nicht erreichbar`, 0);
     }
+
     throw new TenantError(`Netzwerkfehler — Tenant nicht erreichbar`, 0);
   } finally {
     clearTimeout(timer);
@@ -91,6 +111,7 @@ export async function tenantRequest<T = unknown>(
 
   const text = await resp.text();
   let parsed: unknown = undefined;
+
   if (text) {
     try {
       parsed = JSON.parse(text);
@@ -100,14 +121,12 @@ export async function tenantRequest<T = unknown>(
   }
 
   if (!resp.ok) {
-    const detail =
-      parsed && typeof parsed === "object" && "detail" in parsed
-        ? String((parsed as { detail: unknown }).detail)
-        : typeof parsed === "string"
-          ? parsed
-          : undefined;
+    const detail = isDetailRecord(parsed) ? String(parsed.detail) : isPlainString(parsed) ? parsed : undefined;
+
     throw new TenantError(describe(resp.status, detail), resp.status);
   }
 
+  // SAFETY: Tenant is our own trusted backend; this client does not schema-validate
+  // response bodies, so the caller-supplied T is trusted here, not verified.
   return parsed as T;
 }

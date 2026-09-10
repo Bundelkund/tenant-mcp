@@ -33,9 +33,9 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-main().catch((err: unknown) => {
+main().catch((cause: unknown) => {
   // stderr only — stdout is the MCP stdio channel and must stay protocol-clean.
-  const msg = err instanceof Error ? err.message : String(err);
+  const msg = cause instanceof Error ? cause.message : String(cause);
   process.stderr.write(`[tenant-mcp] Start fehlgeschlagen: ${msg}\n`);
   process.exit(1);
 });

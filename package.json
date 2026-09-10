@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=server/index.js --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "lint": "oxlint -c oxlint.config.ts src",
     "typecheck": "tsc --noEmit",
     "inspect": "node server/index.js",
     "validate": "mcpb validate manifest.json",
@@ -18,7 +19,9 @@
   "devDependencies": {
     "@anthropic-ai/mcpb": "^1.1.0",
     "@modelcontextprotocol/inspector": "^0.14.0",
+    "@oxlint/plugins": "1.82.0",
     "esbuild": "^0.24.0",
+    "oxlint": "1.82.0",
     "typescript": "^5.6.0"
   }
 }
